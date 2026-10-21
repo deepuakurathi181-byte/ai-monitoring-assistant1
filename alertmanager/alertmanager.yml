@@ -1,25 +1,16 @@
+
 global:
   resolve_timeout: 5m
 
-# Default route for all alerts. Replace the webhook/receiver with your own
-# (Slack, email, PagerDuty, etc.) for real notifications.
 route:
-  receiver: 'default'
-  group_by: ['alertname', 'instance']
-  group_wait: 30s
-  group_interval: 5m
+  receiver: "ai-assistant"
+  group_by: ["alertname"]
+  group_wait: 10s
+  group_interval: 30s
   repeat_interval: 4h
 
 receivers:
-  - name: 'default'
-    # No-op receiver for local demo. Example Slack config below (commented):
-    # slack_configs:
-    #   - api_url: 'https://hooks.slack.com/services/XXX/YYY/ZZZ'
-    #     channel: '#alerts'
-    #     send_resolved: true
-
-# Suppress lower-severity alerts when a critical alert for the same instance fires.
-inhibit_rules:
-  - source_matchers: [severity="critical"]
-    target_matchers: [severity="warning"]
-    equal: ['instance']
+  - name: "ai-assistant"
+    webhook_configs:
+      - url: "http://ai-assistant:8000/webhook"
+        send_resolved: true

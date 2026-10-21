@@ -1,0 +1,232 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Monitoring Assistant</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0b1120;
+      color: #e5edf8;
+    }
+    header {
+      padding: 24px 6%;
+      border-bottom: 1px solid #263348;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { margin: 0; font-size: 23px; }
+    header p { margin: 7px 0 0; color: #9caec5; font-size: 13px; }
+    main { max-width: 1100px; margin: 32px auto; padding: 0 20px; }
+    .panel {
+      background: #141e30;
+      border: 1px solid #28374e;
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 20px;
+    }
+    .status { color: #fbbf24; font-size: 13px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .metric { font-size: 30px; font-weight: bold; margin-top: 12px; }
+    .muted { color: #9caec5; font-size: 14px; }
+    label { display: block; margin: 16px 0 8px; font-size: 14px; }
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      background: #0b1120;
+      border: 1px solid #35445d;
+      border-radius: 8px;
+      color: white;
+      font: inherit;
+    }
+    textarea { min-height: 90px; resize: vertical; }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 12px 18px;
+      margin-top: 16px;
+      background: #3478f6;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: wait; }
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.6;
+      font: inherit;
+    }
+    .good { color: #4ade80; }
+    .bad { color: #fca5a5; }
+    @media (max-width: 650px) {
+      .grid { grid-template-columns: 1fr; }
+      header { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>AI Monitoring Assistant</h1>
+      <p>Infrastructure health and AI-powered alert analysis</p>
+    </div>
+    <div id="connection" class="status">API not checked</div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Backend connection</h2>
+      <p class="muted">Enter the URL of your running FastAPI service.</p>
+      <label for="apiUrl">API base URL</label>
+      <input id="apiUrl" value="http://localhost:8000"
+             placeholder="https://your-backend.example.com" />
+      <button id="connectBtn" type="button">Check connection and load metrics</button>
+      <p id="connectionMessage" class="muted" aria-live="polite"></p>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <div class="muted">Monitored targets</div>
+        <div id="targetCount" class="metric">—</div>
+      </div>
+      <div class="panel">
+        <div class="muted">Targets UP</div>
+        <div id="targetsUp" class="metric good">—</div>
+      </div>
+      <div class="panel">
+        <div class="muted">Targets DOWN</div>
+        <div id="targetsDown" class="metric bad">—</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Target health</h2>
+      <div id="targets" class="muted">Connect to the API to load target data.</div>
+    </section>
+
+    <section class="panel">
+      <h2>AI alert analysis</h2>
+      <p class="muted">
+        Submit an alert to retrieve monitoring evidence and AI troubleshooting suggestions.
+      </p>
+      <form id="alertForm">
+        <label for="alertName">Alert name</label>
+        <input id="alertName" value="HighCPUUsage" required />
+
+        <label for="alertStatus">Alert status</label>
+        <input id="alertStatus" value="firing" required />
+
+        <label for="description">Description</label>
+        <textarea id="description" required>CPU usage has exceeded 80% for 5 minutes.</textarea>
+
+        <button id="analyzeBtn" type="submit">Analyze alert</button>
+      </form>
+      <p id="analysisStatus" class="muted" aria-live="polite"></p>
+      <pre id="analysisResult"></pre>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function apiBase() {
+      return $("apiUrl").value.trim().replace(/\/+$/, "");
+    }
+
+    async function apiRequest(path, options = {}) {
+      const response = await fetch(apiBase() + path, options);
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(body.detail || `Request failed: ${response.status}`);
+      }
+      return body;
+    }
+
+    async function loadMetrics() {
+      $("connectBtn").disabled = true;
+      $("connectionMessage").textContent = "Checking API and loading metrics...";
+
+      try {
+        await apiRequest("/health");
+        const data = await apiRequest("/metrics");
+
+        $("connection").textContent = "API connected";
+        $("connection").className = "status good";
+        $("targetCount").textContent = data.target_count ?? 0;
+        $("targetsUp").textContent = data.targets_up ?? 0;
+        $("targetsDown").textContent = data.targets_down ?? 0;
+
+        const targets = data.targets || [];
+        $("targets").innerHTML = "";
+
+        if (!targets.length) {
+          $("targets").textContent = "No target data returned by Prometheus.";
+        } else {
+          const list = document.createElement("div");
+
+          targets.forEach((target) => {
+            const row = document.createElement("p");
+            row.className = target.up ? "good" : "bad";
+            row.textContent =
+              `${target.job} — ${target.instance}: ${target.up ? "UP" : "DOWN"}`;
+            list.appendChild(row);
+          });
+
+          $("targets").appendChild(list);
+        }
+
+        $("connectionMessage").textContent = "Metrics loaded successfully.";
+      } catch (error) {
+        $("connection").textContent = "Connection failed";
+        $("connection").className = "status bad";
+        $("connectionMessage").textContent =
+          error.message + ". Check the API URL and backend logs.";
+      } finally {
+        $("connectBtn").disabled = false;
+      }
+    }
+
+    $("connectBtn").addEventListener("click", loadMetrics);
+
+    $("alertForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      $("analyzeBtn").disabled = true;
+      $("analysisStatus").textContent = "Analyzing alert with Ollama...";
+      $("analysisResult").textContent = "";
+
+      try {
+        const result = await apiRequest("/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            alert_name: $("alertName").value.trim(),
+            status: $("alertStatus").value.trim(),
+            description: $("description").value.trim()
+          })
+        });
+
+        $("analysisResult").textContent =
+          result.ai_analysis || JSON.stringify(result, null, 2);
+        $("analysisStatus").textContent =
+          "Analysis received. Suggestions are hypotheses, not confirmed root causes.";
+      } catch (error) {
+        $("analysisStatus").textContent = "Analysis failed: " + error.message;
+      } finally {
+        $("analyzeBtn").disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

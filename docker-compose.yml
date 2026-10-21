@@ -80,6 +80,19 @@ services:
       - monitor-net
     restart: unless-stopped
 
+  ai-assistant:
+    build:
+      context: ./ai-assistant
+      dockerfile: Dockerfile
+    container_name: ai-assistant
+    ports:
+      - "8000:8000"
+    depends_on:
+      - prometheus
+    networks:
+      - monitor-net
+    restart: unless-stopped
+
 volumes:
   grafana-data:
   prometheus-data:

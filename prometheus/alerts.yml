@@ -1,3 +1,4 @@
+
 groups:
   - name: node_alerts
     rules:
@@ -10,6 +11,16 @@ groups:
         annotations:
           summary: "High CPU usage on {{ $labels.instance }}"
           description: "CPU usage is above 80% (current: {{ $value | humanize }}%) for 5 minutes."
+
+      # Temporary test alert for AI assistant webhook integration.
+      - alert: AIAssistantWebhookTest
+        expr: vector(1)
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Test AI assistant alert delivery"
+          description: "Temporary test alert to verify Alertmanager webhook integration."
 
       # Memory usage high: available memory < 10% of total.
       - alert: HighMemoryUsage
